@@ -7,9 +7,9 @@ require 'net/http'
 # Configuração
 #####################################
 # Link do mota.ru que possui o thumb das imagens
-link = 'http://www.mota.ru/en/categories/view/name/nature'
+tags = ['nature']
 # Pasta onde as imagens serão salvas
-folder = 'C:\Users\dobau\Documents\My Dropbox\Photos\wallpaper'
+folder = 'C:\Users\dobau\Pictures\wallpaper'
 # Resolução da imagem ()
 resolution = '1280x1024'
 
@@ -29,30 +29,34 @@ def create_file(resp, file_name)
 	end
 end
 
-# Recupera as imagens de Thumb
-pageThumb = Hpricot(open( URI::escape("http://www.mota.ru/en/categories/view/name/nature") ))
-imageElements = pageThumb.search('img[@class=wallpaperThumb]')
+tags.each { |tag|
+	puts tag
+	
+	# Recupera as imagens de Thumb
+	pageThumb = Hpricot(open( URI::escape("http://www.mota.ru/en/categories/view/name/#{tag}") ))
+	imageElements = pageThumb.search('img[@class=wallpaperThumb]')
 
-if (!imageElements.empty?)
-	create_folder(folder);
+	if (!imageElements.empty?)
+		create_folder(folder);
 
-	puts "Salvando:"
-	# Percorre todas os 'thumbs' encontrados, baixa a foto adicionando /resolution/1280x1024 a imagem
-	imageElements.each {|imageElement|
-		id = imageElement.parent.get_attribute('href').split('/').last
-		puts id
-		
-		pageDownload = Hpricot(open( URI::escape("http://www.mota.ru/en/wallpapers/get/id/#{id}/resolution/#{resolution}") ))
-		src = pageDownload.search('img[@class=wallpaper]').first.get_attribute('src')
-		ext = src.split('.').last
-		#puts src		
+		puts "Salvando:"
+		# Percorre todas os 'thumbs' encontrados, baixa a foto adicionando /resolution/1280x1024 a imagem
+		imageElements.each {|imageElement|
+			id = imageElement.parent.get_attribute('href').split('/').last
+			puts id
+			
+			pageDownload = Hpricot(open( URI::escape("http://www.mota.ru/en/wallpapers/get/id/#{id}/resolution/#{resolution}") ))
+			src = pageDownload.search('img[@class=wallpaper]').first.get_attribute('src')
+			ext = src.split('.').last
+			#puts src		
 
-		url = URI::parse(src)
-		req = Net::HTTP::Get.new(url.path)
-		Net::HTTP.start(url.host, url.port) {|http|
-			resp = http.request( req )
-			create_file(resp, "#{folder}/#{id}.#{ext}")			
+			url = URI::parse(src)
+			req = Net::HTTP::Get.new(url.path)
+			Net::HTTP.start(url.host, url.port) {|http|
+				resp = http.request( req )
+				create_file(resp, "#{folder}/#{id}.#{ext}")			
+			}
+			#puts 'Sucesso.'
 		}
-		#puts 'Sucesso.'
-	}
-end
+	end
+}
