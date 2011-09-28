@@ -7,16 +7,20 @@ require 'net/http'
 # Configura��o
 #####################################
 # Link do mota.ru que possui o thumb das imagens
-tags = ['nature']
+TAGS = ['nature']
 # Pasta onde as imagens ser�o salvas
-folder = 'C:\Users\dobau\Pictures\wallpaper'
+FOLDER = 'C:\Users\dobau\Pictures\wallpaper'
 # Resolu��o da imagem ()
-resolution = '1280x1024'
+RESOLUTION = '1280x1024'
 
+URL_MOTARU = 'http://www.mota.ru/en/'
 
+def get_page(url)
+	return Hpricot(open( URI::escape(url) ))
+end
 
-# M�todo para criar a pasta onde as imagens devem ser salvas se n�o existe
-def create_folder(directory_name)
+# M�todo para criar a pasta onde as imagens devem ser salvas se  não existe
+def create_folder_if(directory_name)
 	Dir::mkdir(directory_name) if not FileTest::directory?(directory_name)
 end
 
@@ -29,34 +33,46 @@ def create_file(resp, file_name)
 	end
 end
 
-tags.each { |tag|
-	puts tag
-	
-	# Recupera as imagens de Thumb
-	pageThumb = Hpricot(open( URI::escape("http://www.mota.ru/en/categories/view/name/#{tag}") ))
-	imageElements = pageThumb.search("//div[@id='categoryWallpapersList']//img[@class='wallpaperThumb']")
+# Recupera as imagens de Thumb
+def get_images(tag)
+	pageThumb = get_page("#{URL_MOTARU}/categories/view/name/#{tag}")
+	return pageThumb.search("//div[@id='categoryWallpapersList']//img[@class='wallpaperThumb']")
+end
 
-	if (!imageElements.empty?)
-		create_folder(folder);
+# Baixa a imagem e salva no destino
+def down_image(src, dest)
+	url = URI::parse(src)
+	req = Net::HTTP::Get.new(url.path)
+	Net::HTTP.start(url.host, url.port) { |http|
+		resp = http.request( req )
+		create_file(resp, dest)			
+	}
+end
 
-		puts "Salvando:"
+def get_src(id, resolution)
+	pageDownload = get_page("#{URL_MOTARU}/wallpapers/get/id/#{id}/resolution/#{resolution}")
+	src = pageDownload.search('img[@class=wallpaper]').first.get_attribute('src')
+
+end
+
+def get_id(imageElement)
+	return imageElement.parent.get_attribute('href').split('/').last
+end
+
+def main(tags, resolution, folder)
+	create_folder_if(folder);
+
+	tags.each { |tag|
 		# Percorre todas os 'thumbs' encontrados, baixa a foto adicionando /resolution/1280x1024 a imagem
-		imageElements.each {|imageElement|
-			id = imageElement.parent.get_attribute('href').split('/').last
-			puts id
-			
-			pageDownload = Hpricot(open( URI::escape("http://www.mota.ru/en/wallpapers/get/id/#{id}/resolution/#{resolution}") ))
-			src = pageDownload.search('img[@class=wallpaper]').first.get_attribute('src')
+		get_images(tag).each { |img|
+			src = get_src(get_id(img), resolution)
 			ext = src.split('.').last
-			#puts src		
-
-			url = URI::parse(src)
-			req = Net::HTTP::Get.new(url.path)
-			Net::HTTP.start(url.host, url.port) {|http|
-				resp = http.request( req )
-				create_file(resp, "#{folder}/#{id}.#{ext}")			
-			}
-			#puts 'Sucesso.'
+	
+			dest = "#{folder}/#{id}.#{ext}"
+			down_image(src, dest)
 		}
-	end
-}
+	}
+end
+
+
+main(TAGS, RESOLUTION, FOLDER);
